@@ -1,6 +1,6 @@
 # Datavarge
 
-Personal Android app that passively logs cellular signal strength by location, draws heat maps, compares carriers on the same places, and shows what each candidate plan would save (or cost) per month and per year. Private, sideloaded, no backend. (Formerly "SignalSurvey"; the original spec is `signalsurvey-blueprint-v1.md`.)
+Android app that passively logs cellular signal strength by location, draws heat maps, compares carriers on the same places, and shows what each candidate plan would save (or cost) per month and per year. Works with any carrier's SIM. Sideloaded, no backend, no accounts; all data stays on the phone.
 
 ## What it does
 
@@ -8,7 +8,7 @@ Personal Android app that passively logs cellular signal strength by location, d
 - Losing service is logged as a sample with no dBm. Dead zones show black on the map.
 - **Map**: 20 m grid colored by the median signal per cell; pick two carriers for difference mode.
 - **Compare**: place-weighted median, p10, % usable cells, no-service %, speed-test medians, plus a head-to-head on shared cells only. It never declares a "winner".
-- **Savings**: plan snapshot (`app/src/main/assets/plans.json`, prices checked 2026-11-09) against what you pay now, with hotspot add-on and estimated tax.
+- **Savings**: plan snapshot (`app/src/main/assets/plans.json`, prices checked 2026-11-09) against what you pay now, with hotspot add-on and estimated tax. Pick your current plan from the list, or choose "Other / not listed" and enter what you pay.
 - **Export**: zip with CSVs and a self-contained `heatmap.html` for your computer.
 
 ## Build
@@ -31,16 +31,18 @@ adb shell am start -n app.datavarge/.MainActivity
 adb logcat -s Datavarge          # app log lines
 ```
 
-## Phone setup (Samsung Galaxy A34)
+## Phone setup
 
-1. **Developer options**: Settings > About phone > Software information > tap **Build number** 7 times.
+Install the APK from the [latest release](../../releases/latest) (allow "Install unknown apps" for your browser or file manager), or build it yourself and install over USB:
+
+1. **Developer options**: Settings > About phone > Software information > tap **Build number** 7 times (on non-Samsung phones: Settings > About phone > Build number).
 2. Settings > Developer options > turn on **USB debugging**. Plug in, tap **Allow** on "Allow USB debugging?".
 3. Open Datavarge and follow the setup wizard:
    - Location: **Precise**, then **Allow all the time**.
    - Phone and Notifications: **Allow**.
    - Battery: allow background running.
 
-### Battery settings (important on Samsung)
+### Battery settings (important on Samsung and other aggressive OEMs)
 
 - Settings > Apps > Datavarge > Battery > **Unrestricted**.
 - Settings > Battery > Background usage limits: Datavarge must **not** be in **Sleeping apps** or **Deep sleeping apps**. This is the setting people most often miss.
@@ -50,7 +52,7 @@ If Android still stops the service, a watchdog (every ~30 min) restarts it, or p
 ## Swapping SIMs
 
 1. Power off, swap the SIM, power on. Open Datavarge once (this also restarts logging if the reboot didn't).
-2. You'll be asked: "New SIM detected. What should we call it?" Pick Boost, Tello, US Mobile, or type a name like "US Mobile (Verizon)".
+2. You'll be asked: "New SIM detected. What should we call it?" Pick a suggestion (AT&T, Verizon, T-Mobile, Boost, Tello, US Mobile, Mint, Visible, Cricket, Metro, or the name the SIM reports) or type your own, like "US Mobile (Verizon)".
 3. Until you label it, points are stored as `Unlabeled`; they're relabeled automatically when you name it. You can rename SIMs any time in More.
 4. Repeat your usual routes for 2 to 3 days. The head-to-head needs at least 20 shared 20 m cells with 3+ samples from each carrier.
 
@@ -74,11 +76,11 @@ The zip has `samples.csv`, `speed_tests.csv`, `heatmap.html` (open in a browser 
 ## Known limitations
 
 - Only one SIM is measured at a time; comparing needs SIM swaps and similar routes.
-- The A34 has no barometer, and GPS altitude isn't accurate enough to tell floors apart. Use the Test now note ("garage level 2") for floors. Phones with a barometer get a Level filter on the map.
+- GPS altitude isn't accurate enough to tell floors apart. On phones without a barometer, use the Test now note ("garage level 2") for floors. Phones with a barometer get a Level filter on the map.
 - Signal strength is not speed. Speed varies with time of day and congestion.
 - Samsung may still stop background apps; the watchdog tells you when that happens.
 - After a reboot the app tries to resume by itself; if Android refuses, a notification asks you to tap to resume (or open the app once).
 - The carrier name the phone reports can be the host network, not the brand. That's why labels are user-set.
-- Plan prices are a snapshot, and some sources disagree. Confirm on each carrier's site.
+- Plan prices are a snapshot of a few US prepaid plans, and some sources disagree. Confirm on each carrier's site. To compare other plans, edit `app/src/main/assets/plans.json` and rebuild; signal logging and comparison work with any carrier regardless.
 - Airplane mode pauses logging rather than recording a dead zone (radio off is not a coverage result).
 - When you stay in one place that's already capped (6 samples), no new automatic samples are stored there. That's intended; "hours logged" on Compare is tracked separately so it stays accurate.

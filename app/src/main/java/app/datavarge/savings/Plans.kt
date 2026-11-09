@@ -38,6 +38,10 @@ data class SavingsInputs(
     val currentMonthly: Double = 25.00,
     val needsHotspot: Boolean = true,
     val taxRate: Double = 0.14,
+    /** Which plan the user is on now: a plan id from the snapshot, [Savings.OTHER], or null for the snapshot's default. */
+    val baselinePlanId: String? = null,
+    /** For [Savings.OTHER]: whether the price the user typed already includes taxes and fees. */
+    val otherTaxesIncluded: Boolean = false,
 )
 
 data class PlanResult(
@@ -50,6 +54,9 @@ data class PlanResult(
 )
 
 object Savings {
+    /** "My plan isn't listed": the user's typed price is the whole story (including any add-ons they pay for). */
+    const val OTHER = "other"
+
     private val json = Json { ignoreUnknownKeys = true }
 
     fun parse(text: String): PlanSnapshot = json.decodeFromString(PlanSnapshot.serializer(), text)
@@ -67,16 +74,32 @@ object Savings {
     fun effectiveMonthly(plan: Plan, inputs: SavingsInputs, priceOverride: Double? = null): Double =
         taxed((priceOverride ?: plan.monthly) + hotspotAddon(plan, inputs.needsHotspot), plan, inputs.taxRate)
 
-    /** The baseline uses the user's own current price, with the baseline plan's hotspot and tax rules. */
+    fun baselineId(snapshot: PlanSnapshot, inputs: SavingsInputs): String = inputs.baselinePlanId ?: snapshot.baselinePlanId
+
+    fun baselinePlan(snapshot: PlanSnapshot, inputs: SavingsInputs): Plan? =
+        snapshot.plans.firstOrNull { it.id == baselineId(snapshot, inputs) }
+
+    /**
+     * The baseline uses the user's own current price. For a listed plan, that plan's hotspot and tax rules apply;
+     * for [OTHER], the typed price is taxed unless the user says taxes are already included.
+     */
     fun baselineEffective(snapshot: PlanSnapshot, inputs: SavingsInputs): Double {
-        val base = snapshot.plans.firstOrNull { it.id == snapshot.baselinePlanId }
-            ?: return inputs.currentMonthly * (1 + inputs.taxRate)
+        val base = baselinePlan(snapshot, inputs)
+            ?: return if (inputs.otherTaxesIncluded) inputs.currentMonthly else inputs.currentMonthly * (1 + inputs.taxRate)
         return effectiveMonthly(base, inputs, priceOverride = inputs.currentMonthly)
+    }
+
+    /** A plan whose provider matches a SIM label ("Boost" -> Boost Mobile), only if exactly one plan matches. */
+    fun planForLabel(snapshot: PlanSnapshot, label: String): Plan? {
+        val l = label.trim().lowercase().ifEmpty { return null }
+        val matches = snapshot.plans.filter { val p = it.provider.lowercase(); p.startsWith(l) || l.startsWith(p) }
+        return matches.singleOrNull()
     }
 
     fun results(snapshot: PlanSnapshot, inputs: SavingsInputs): List<PlanResult> {
         val baseline = baselineEffective(snapshot, inputs)
-        return snapshot.plans.filter { it.id != snapshot.baselinePlanId }.map { p ->
+        val baseId = baselineId(snapshot, inputs)
+        return snapshot.plans.filter { it.id != baseId }.map { p ->
             val eff = effectiveMonthly(p, inputs)
             val sm = baseline - eff
             PlanResult(

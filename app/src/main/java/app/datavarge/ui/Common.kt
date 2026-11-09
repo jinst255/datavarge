@@ -77,15 +77,16 @@ fun SectionCard(modifier: Modifier = Modifier, container: Color? = null, content
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun LabelChips(selected: String, onSelect: (String) -> Unit, onOther: () -> Unit) {
+fun LabelChips(selected: String, onSelect: (String) -> Unit, onOther: () -> Unit, extra: String? = null) {
+    val options = (listOfNotNull(extra) + SimTracker.SUGGESTIONS).distinct()
     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        SimTracker.SUGGESTIONS.forEach { s ->
+        options.forEach { s ->
             FilterChip(selected = selected == s, onClick = { onSelect(s) }, label = { Text(s) })
         }
         FilterChip(
-            selected = selected.isNotEmpty() && selected !in SimTracker.SUGGESTIONS,
+            selected = selected.isNotEmpty() && selected !in options,
             onClick = onOther,
-            label = { Text(if (selected.isNotEmpty() && selected !in SimTracker.SUGGESTIONS) selected else "Other") },
+            label = { Text(if (selected.isNotEmpty() && selected !in options) selected else "Other") },
         )
     }
 }
@@ -94,14 +95,16 @@ fun LabelChips(selected: String, onSelect: (String) -> Unit, onOther: () -> Unit
 @Composable
 fun LabelDialog(title: String, initial: String, operatorName: String?, onDismiss: () -> Unit, onSave: (String) -> Unit) {
     var value by remember { mutableStateOf(initial) }
-    var typing by remember { mutableStateOf(initial.isNotEmpty() && initial !in SimTracker.SUGGESTIONS) }
+    val extra = SimTracker.suggest(operatorName)
+    val options = (listOfNotNull(extra) + SimTracker.SUGGESTIONS).distinct()
+    var typing by remember { mutableStateOf(initial.isNotEmpty() && initial !in options) }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(title) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 if (operatorName != null) Text("The SIM reports \"$operatorName\".", style = MaterialTheme.typography.bodySmall)
-                LabelChips(selected = value, onSelect = { value = it; typing = false }, onOther = { typing = true; if (value in SimTracker.SUGGESTIONS) value = "" })
+                LabelChips(selected = value, onSelect = { value = it; typing = false }, onOther = { typing = true; if (value in options) value = "" }, extra = extra)
                 if (typing) OutlinedTextField(
                     value = value, onValueChange = { value = it.take(40) }, singleLine = true,
                     label = { Text("Name, e.g. US Mobile (Verizon)") }, modifier = Modifier.fillMaxWidth(),

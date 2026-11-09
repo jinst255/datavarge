@@ -64,4 +64,28 @@ class SavingsTest {
         val r2 = Savings.results(snap, SavingsInputs(25.0, false, 0.0)).single()
         assertEquals(15.0, r2.effectiveMonthly, 1e-9)
     }
+
+    @Test fun otherCarrierBaseline() {
+        // Not on any listed plan: typed price is taxed unless the user says taxes are included.
+        val other = SavingsInputs(40.0, needsHotspot = true, taxRate = 0.10, baselinePlanId = Savings.OTHER)
+        assertEquals(44.0, Savings.baselineEffective(snapshot, other), 1e-9)
+        assertEquals(40.0, Savings.baselineEffective(snapshot, other.copy(otherTaxesIncluded = true)), 1e-9)
+        // Every listed plan is a candidate, including Boost.
+        assertEquals(5, Savings.results(snapshot, other).size)
+    }
+
+    @Test fun choosingAListedPlanAsBaselineExcludesIt() {
+        val onUsm = SavingsInputs(25.0, needsHotspot = true, taxRate = 0.14, baselinePlanId = "usm_starter_tmobile")
+        assertEquals(25.0, Savings.baselineEffective(snapshot, onUsm), 1e-9) // taxes included, hotspot included
+        val ids = Savings.results(snapshot, onUsm).map { it.plan.id }
+        assertTrue("usm_starter_tmobile" !in ids)
+        assertTrue("boost_unlimited" in ids)
+    }
+
+    @Test fun planForLabel() {
+        assertEquals("boost_unlimited", Savings.planForLabel(snapshot, "Boost")?.id)
+        assertEquals("tello_20gb", Savings.planForLabel(snapshot, "Tello")?.id)
+        assertEquals(null, Savings.planForLabel(snapshot, "US Mobile")) // several plans: ambiguous
+        assertEquals(null, Savings.planForLabel(snapshot, "Verizon"))
+    }
 }

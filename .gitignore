@@ -6,3 +6,6 @@ local.properties
 *.iml
 .kotlin/
 captures/
+
+# Personal planning notes (kept local)
+signalsurvey-blueprint-v1.md

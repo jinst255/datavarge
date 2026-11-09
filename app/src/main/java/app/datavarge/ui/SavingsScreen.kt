@@ -11,7 +11,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.material3.AssistChip
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -41,6 +44,7 @@ import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
 import java.util.Locale
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun SavingsScreen() {
     val c = LocalContext.current
@@ -49,7 +53,10 @@ fun SavingsScreen() {
     var priceText by rememberSaveable { mutableStateOf(String.format(Locale.US, "%.2f", prefs.currentMonthly)) }
     var taxText by rememberSaveable { mutableStateOf(String.format(Locale.US, "%.0f", prefs.taxRate * 100)) }
     var hotspot by rememberSaveable { mutableStateOf(prefs.needsHotspot) }
-    val inputs = SavingsInputs(priceText.toDoubleOrNull() ?: 0.0, hotspot, (taxText.toDoubleOrNull() ?: 0.0) / 100)
+    var baseId by rememberSaveable { mutableStateOf(prefs.baselinePlanId ?: snapshot.baselinePlanId) }
+    var otherTaxIncl by rememberSaveable { mutableStateOf(prefs.otherTaxesIncluded) }
+    val inputs = SavingsInputs(priceText.toDoubleOrNull() ?: 0.0, hotspot, (taxText.toDoubleOrNull() ?: 0.0) / 100, baseId, otherTaxIncl)
+    val basePlan = snapshot.plans.firstOrNull { it.id == baseId }
     val results = remember(inputs) { Savings.results(snapshot, inputs) }
     val baseline = remember(inputs) { Savings.baselineEffective(snapshot, inputs) }
 
@@ -88,6 +95,24 @@ fun SavingsScreen() {
         item {
             SectionCard {
                 Text("What you pay now", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                Text("Your current plan", style = MaterialTheme.typography.labelLarge)
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    snapshot.plans.forEach { p ->
+                        FilterChip(selected = baseId == p.id, onClick = {
+                            baseId = p.id; prefs.baselinePlanId = p.id
+                            priceText = String.format(Locale.US, "%.2f", p.monthly); prefs.currentMonthly = p.monthly.toFloat()
+                        }, label = { Text("${p.provider} ${p.name}") })
+                    }
+                    FilterChip(selected = baseId == Savings.OTHER, onClick = { baseId = Savings.OTHER; prefs.baselinePlanId = Savings.OTHER },
+                        label = { Text("Other / not listed") })
+                }
+                if (basePlan == null) {
+                    Text("Enter what you pay each month, including any add-ons (like hotspot) you pay for.", style = MaterialTheme.typography.bodySmall)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("Price already includes taxes and fees", Modifier.weight(1f))
+                        Switch(checked = otherTaxIncl, onCheckedChange = { otherTaxIncl = it; prefs.otherTaxesIncluded = it })
+                    }
+                }
                 OutlinedTextField(
                     value = priceText,
                     onValueChange = { v -> priceText = v.filter { it.isDigit() || it == '.' }.take(7); priceText.toFloatOrNull()?.let { prefs.currentMonthly = it } },
@@ -106,7 +131,7 @@ fun SavingsScreen() {
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal), modifier = Modifier.fillMaxWidth(),
                 )
                 Text("Your effective cost: ${Savings.money(baseline)}/mo (${Savings.money(baseline * 12)}/yr)", fontWeight = FontWeight.Medium)
-                signalFor("Boost Mobile")?.let { (l, v) -> Text("Your $l signal: ${fmtDbm(v)} (place-weighted median)", style = MaterialTheme.typography.bodySmall) }
+                basePlan?.let { bp -> signalFor(bp.provider)?.let { (l, v) -> Text("Your $l signal: ${fmtDbm(v)} (place-weighted median)", style = MaterialTheme.typography.bodySmall) } }
             }
         }
         items(results, key = { it.plan.id }) { r -> PlanRow(r, signalFor(r.plan.provider)) }

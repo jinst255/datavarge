@@ -139,7 +139,7 @@ object Exporter {
           altitude_m             Mean-sea-level altitude when the phone provides it, else GPS ellipsoid height.
                                  GPS altitude is typically off by 10-30 m: not good enough to tell floors apart.
           altitude_accuracy_m    Vertical accuracy, if known.
-          pressure_hpa           Barometer reading (empty on phones without one, e.g. Galaxy A34).
+          pressure_hpa           Barometer reading (empty on phones without one).
           speed_mps              Ground speed from the location fix.
           carrier_label          Your label for the SIM (Boost, Tello, ...). "Unlabeled" until you name it.
           sim_key                Subscription ID + MCC/MNC, identifies the physical SIM.

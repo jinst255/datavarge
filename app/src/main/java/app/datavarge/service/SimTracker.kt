@@ -100,17 +100,29 @@ class SimTracker private constructor(private val ctx: Context) {
             inst ?: SimTracker(c.applicationContext).also { inst = it }
         }
 
-        val SUGGESTIONS = listOf("Boost", "Tello", "US Mobile")
+        /** Common US carriers and MVNOs offered as one-tap labels. Any other name can be typed. */
+        val SUGGESTIONS = listOf(
+            "AT&T", "Verizon", "T-Mobile", "Boost", "Tello", "US Mobile", "Mint", "Visible", "Cricket", "Metro",
+        )
 
-        /** Best guess from the SIM's operator name, used only to pre-select a chip. */
+        private val BRANDS = listOf(
+            "boost" to "Boost", "tello" to "Tello", "us mobile" to "US Mobile", "usmobile" to "US Mobile",
+            "mint" to "Mint", "visible" to "Visible", "cricket" to "Cricket", "metro" to "Metro",
+            "google fi" to "Google Fi", "project fi" to "Google Fi", "straight talk" to "Straight Talk",
+            "total" to "Total Wireless", "tracfone" to "Tracfone", "xfinity" to "Xfinity Mobile",
+            "spectrum" to "Spectrum Mobile", "consumer cellular" to "Consumer Cellular", "h2o" to "H2O",
+            "red pocket" to "Red Pocket", "ultra" to "Ultra Mobile", "lyca" to "Lyca Mobile",
+            "t-mobile" to "T-Mobile", "tmobile" to "T-Mobile", "verizon" to "Verizon", "at&t" to "AT&T", "att" to "AT&T",
+        )
+
+        /**
+         * Best guess from the SIM's reported operator name, used only to pre-fill the label.
+         * MVNOs often report their host network, which is why the user always confirms it.
+         */
         fun suggest(operatorName: String?): String? {
-            val o = operatorName?.lowercase() ?: return null
-            return when {
-                "boost" in o -> "Boost"
-                "tello" in o -> "Tello"
-                "us mobile" in o || "usmobile" in o -> "US Mobile"
-                else -> null
-            }
+            val raw = operatorName?.trim()?.takeIf { it.isNotEmpty() } ?: return null
+            val o = raw.lowercase()
+            return BRANDS.firstOrNull { (k, _) -> o.contains(k) }?.second ?: raw.take(40)
         }
     }
 }

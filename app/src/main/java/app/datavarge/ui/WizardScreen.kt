@@ -38,6 +38,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import app.datavarge.savings.Savings
 import app.datavarge.service.LoggingService
 import app.datavarge.service.SimTracker
 import app.datavarge.util.DebugLog
@@ -137,7 +138,7 @@ fun WizardScreen(onDone: () -> Unit) {
                 var typing by remember { mutableStateOf(false) }
                 Body(if (sim.present) "What should we call the SIM that's in the phone now?" + (sim.operatorName?.let { " (It reports \"$it\".)" } ?: "")
                      else "No SIM detected. You can label it later in More.")
-                LabelChips(selected = label, onSelect = { label = it; typing = false }, onOther = { typing = true; label = "" })
+                LabelChips(selected = label, onSelect = { label = it; typing = false }, onOther = { typing = true; label = "" }, extra = SimTracker.suggest(sim.operatorName))
                 if (typing) OutlinedTextField(value = label, onValueChange = { label = it.take(40) }, label = { Text("Name, e.g. US Mobile (Verizon)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
 
                 var price by rememberSaveable { mutableStateOf(String.format(java.util.Locale.US, "%.2f", prefs.currentMonthly)) }
@@ -153,6 +154,11 @@ fun WizardScreen(onDone: () -> Unit) {
                 Button(onClick = {
                     price.toFloatOrNull()?.let { prefs.currentMonthly = it }
                     prefs.needsHotspot = hotspot
+                    // Current plan for Savings: the one plan matching this carrier, otherwise "Other" (changeable in Savings).
+                    if (label.isNotBlank()) {
+                        val snap = Savings.load(c)
+                        prefs.baselinePlanId = Savings.planForLabel(snap, label)?.id ?: Savings.OTHER
+                    }
                     if (sim.present && label.isNotBlank()) scope.launch { SimTracker.get(c).setLabel(sim.key, label) }
                     step++
                 }) { Text("Continue") }

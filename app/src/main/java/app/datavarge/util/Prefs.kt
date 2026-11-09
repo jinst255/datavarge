@@ -55,7 +55,16 @@ class Prefs(context: Context) {
         get() = sp.getString("pending_label_sim", null)
         set(v) = sp.edit().putString("pending_label_sim", v).apply()
 
-    fun savingsInputs() = SavingsInputs(currentMonthly.toDouble(), needsHotspot, taxRate.toDouble())
+    /** Current plan id from plans.json, "other", or null for the snapshot's default. */
+    var baselinePlanId: String?
+        get() = sp.getString("baseline_plan_id", null)
+        set(v) = sp.edit().putString("baseline_plan_id", v).apply()
+
+    var otherTaxesIncluded: Boolean
+        get() = sp.getBoolean("other_taxes_included", false)
+        set(v) = sp.edit().putBoolean("other_taxes_included", v).apply()
+
+    fun savingsInputs() = SavingsInputs(currentMonthly.toDouble(), needsHotspot, taxRate.toDouble(), baselinePlanId, otherTaxesIncluded)
 
     fun changes(): Flow<String?> = callbackFlow {
         val l = SharedPreferences.OnSharedPreferenceChangeListener { _, key -> trySend(key) }
