@@ -1,0 +1,11 @@
+.gradle/
+build/
+app/build/
+local.properties
+.idea/
+*.iml
+.kotlin/
+captures/
+
+# Personal planning notes (kept local)
+signalsurvey-blueprint-v1.md

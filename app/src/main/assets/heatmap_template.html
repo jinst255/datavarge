@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Datavarge heat map</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<style>
+  :root { --bg:#fff; --fg:#1d1d1f; --muted:#666; --panel:rgba(255,255,255,.95); --border:#ddd; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#121212; --fg:#eee; --muted:#aaa; --panel:rgba(30,30,30,.95); --border:#444; } }
+  html, body { margin:0; height:100%; background:var(--bg); color:var(--fg); font:14px/1.4 system-ui, sans-serif; }
+  #map { position:absolute; inset:0; }
+  #panel { position:absolute; top:10px; right:10px; z-index:1000; background:var(--panel); border:1px solid var(--border);
+           border-radius:10px; padding:10px 12px; max-width:260px; box-shadow:0 2px 10px rgba(0,0,0,.2); }
+  #panel h1 { font-size:15px; margin:0 0 6px; }
+  #panel label { display:block; margin:6px 0 2px; color:var(--muted); font-size:12px; }
+  #panel select { width:100%; padding:4px; background:var(--bg); color:var(--fg); border:1px solid var(--border); border-radius:6px; }
+  .legend div { display:flex; align-items:center; gap:6px; font-size:12px; margin:2px 0; }
+  .sw { width:14px; height:14px; border-radius:3px; border:1px solid rgba(0,0,0,.3); }
+  #stats { font-size:12px; color:var(--muted); margin-top:6px; }
+  .leaflet-popup-content { font-size:13px; }
+</style>
+</head>
+<body>
+<div id="map"></div>
+<div id="panel">
+  <h1>Datavarge</h1>
+  <label for="carrier">Carrier</label>
+  <select id="carrier"></select>
+  <label for="carrierB">Compare with (difference mode)</label>
+  <select id="carrierB"></select>
+  <label for="metric">Metric</label>
+  <select id="metric"><option value="signal">Signal (dBm)</option><option value="down">Download speed</option></select>
+  <div class="legend" id="legend"></div>
+  <div id="stats"></div>
+</div>
+<script>
+const DATA = /*__DATA__*/null;
+const CELL = 20, MPD = 111320, NO_SVC = -150, MAX_MAP_ACC = 50;
+const BINS = [
+  { min:-85,  label:'Excellent (≥ -85)',   color:'#1B9E3E' },
+  { min:-95,  label:'Good (-85 to -95)',   color:'#8BC34A' },
+  { min:-105, label:'Fair (-95 to -105)',  color:'#FFD600' },
+  { min:-115, label:'Poor (-105 to -115)', color:'#FF8F00' },
+  { min:-1e9, label:'Very poor (< -115)',  color:'#E53935' },
+];
+const SPEED_BINS = [
+  { min:50, label:'≥ 50 Mbps', color:'#1B9E3E' }, { min:25, label:'25–50', color:'#8BC34A' },
+  { min:10, label:'10–25', color:'#FFD600' }, { min:3, label:'3–10', color:'#FF8F00' }, { min:-1, label:'< 3', color:'#E53935' },
+];
+const DEAD = '#212121';
+// Same grid as the app (analysis/Grid.kt).
+function rowCenterLat(r) { return (r + 0.5) * CELL / MPD; }
+function lonMPD(r) { return MPD * Math.cos(rowCenterLat(r) * Math.PI / 180); }
+function keyOf(lat, lon) { const r = Math.floor(lat * MPD / CELL); return [r, Math.floor(lon * lonMPD(r) / CELL)]; }
+function bounds(r, c) { const m = lonMPD(r); return [[r * CELL / MPD, c * CELL / m], [(r + 1) * CELL / MPD, (c + 1) * CELL / m]]; }
+function median(a) { if (!a.length) return null; const s = [...a].sort((x, y) => x - y), n = s.length; return n % 2 ? s[(n - 1) / 2] : (s[n / 2 - 1] + s[n / 2]) / 2; }
+function binFor(v, bins) { return bins.find(b => v >= b.min); }
+function sig(s) { return s.no_service ? NO_SVC : s.dbm; }
+function fmtTime(ms) { return new Date(ms).toLocaleString(); }
+function esc(t) { return String(t).replace(/[&<>"]/g, ch => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;' }[ch])); }
+
+const map = L.map('map');
+L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '&copy; OpenStreetMap contributors' }).addTo(map);
+const layer = L.layerGroup().addTo(map);
+const samples = (DATA && DATA.samples) || [];
+const labels = [...new Set(samples.map(s => s.label))];
+const selA = document.getElementById('carrier'), selB = document.getElementById('carrierB'), selM = document.getElementById('metric');
+labels.forEach(l => selA.add(new Option(l, l)));
+selB.add(new Option('— none —', ''));
+labels.forEach(l => selB.add(new Option(l, l)));
+
+function cellsFor(label) {
+  const cells = new Map();
+  samples.filter(s => s.label === label && (s.acc == null || s.acc <= MAX_MAP_ACC)).forEach(s => {
+    const [r, c] = keyOf(s.lat, s.lon), k = r + ':' + c;
+    if (!cells.has(k)) cells.set(k, { r, c, items: [] });
+    cells.get(k).items.push(s);
+  });
+  cells.forEach(cell => {
+    const vals = cell.items.map(sig).filter(v => v != null);
+    cell.vals = vals; cell.median = median(vals);
+    cell.down = median(cell.items.filter(s => s.cell === true && s.down != null).map(s => s.down));
+  });
+  return cells;
+}
+
+function popup(cell, label) {
+  const types = [...new Set(cell.items.map(s => s.net))].join(', ');
+  const notes = cell.items.filter(s => s.note).map(s => '• ' + esc(s.note)).join('<br>');
+  const worst = cell.vals.length ? Math.min(...cell.vals) : null;
+  return `<b>${esc(label)}</b><br>${cell.items.length} samples<br>` +
+    `Median: ${cell.median == null ? '–' : cell.median <= NO_SVC ? 'No service' : cell.median.toFixed(0) + ' dBm'}<br>` +
+    `Worst: ${worst == null ? '–' : worst <= NO_SVC ? 'No service' : worst + ' dBm'}<br>` +
+    (cell.down != null ? `Median download: ${cell.down.toFixed(1)} Mbps<br>` : '') +
+    `Networks: ${esc(types)}<br>Last: ${fmtTime(Math.max(...cell.items.map(s => s.ts)))}` + (notes ? '<br>' + notes : '');
+}
+
+function legend(items) {
+  document.getElementById('legend').innerHTML = items.map(([c, t]) => `<div><span class="sw" style="background:${c}"></span>${t}</div>`).join('');
+}
+
+function draw() {
+  layer.clearLayers();
+  const a = selA.value, b = selB.value, metric = selM.value;
+  const statsEl = document.getElementById('stats');
+  if (!a) { statsEl.textContent = 'No data in this export.'; return; }
+  const ca = cellsFor(a);
+  const all = [];
+  if (b && b !== a) {
+    const cb = cellsFor(b);
+    let wins = 0, ties = 0, losses = 0;
+    ca.forEach((cell, k) => {
+      const other = cb.get(k);
+      if (!other || cell.vals.length < 3 || other.vals.length < 3) return;
+      const d = cell.median - other.median;
+      const color = d >= 3 ? '#1B9E3E' : d <= -3 ? '#E53935' : '#9E9E9E';
+      if (d >= 3) wins++; else if (d <= -3) losses++; else ties++;
+      const rect = L.rectangle(bounds(cell.r, cell.c), { color, weight: 0, fillOpacity: .6 }).addTo(layer);
+      rect.bindPopup(`<b>${esc(a)} vs ${esc(b)}</b><br>Difference: ${d.toFixed(1)} dB<br>${esc(a)}: ${cell.median.toFixed(0)} dBm (${cell.vals.length})<br>${esc(b)}: ${other.median.toFixed(0)} dBm (${other.vals.length})`);
+      all.push(rect.getBounds());
+    });
+    legend([['#1B9E3E', esc(a) + ' better (≥ 3 dB)'], ['#9E9E9E', 'Tie (< 3 dB)'], ['#E53935', esc(b) + ' better (≥ 3 dB)']]);
+    const shared = wins + ties + losses;
+    statsEl.innerHTML = `${shared} shared cells (≥ 3 samples each). ${esc(a)} better: ${wins}, ties: ${ties}, ${esc(b)} better: ${losses}.` +
+      (shared < 20 ? '<br>Not enough overlapping places yet. Repeat your usual routes with each SIM.' : '');
+  } else {
+    const dead = [];
+    ca.forEach(cell => {
+      let color;
+      if (metric === 'down') { if (cell.down == null) return; color = binFor(cell.down, SPEED_BINS).color; }
+      else { if (cell.median == null) return; if (cell.median <= NO_SVC) { dead.push(cell); return; } color = binFor(cell.median, BINS).color; }
+      const rect = L.rectangle(bounds(cell.r, cell.c), { color, weight: 0, fillOpacity: .55 }).addTo(layer);
+      rect.bindPopup(popup(cell, a)); all.push(rect.getBounds());
+    });
+    // Dead zones always on top.
+    dead.forEach(cell => { const r = L.rectangle(bounds(cell.r, cell.c), { color: DEAD, weight: 1, fillOpacity: .85 }).addTo(layer); r.bindPopup(popup(cell, a)); all.push(r.getBounds()); });
+    legend((metric === 'down' ? SPEED_BINS : BINS).map(b => [b.color, b.label]).concat(metric === 'down' ? [] : [[DEAD, 'No service']]));
+    statsEl.textContent = `${ca.size} cells • ${samples.filter(s => s.label === a).length} samples (accuracy worse than 50 m not drawn)`;
+  }
+  if (all.length) map.fitBounds(all.reduce((acc, bb) => acc.extend(bb), L.latLngBounds(all[0].getSouthWest(), all[0].getNorthEast())), { maxZoom: 17 });
+}
+[selA, selB, selM].forEach(el => el.addEventListener('change', draw));
+if (samples.length) { map.setView([samples[samples.length - 1].lat, samples[samples.length - 1].lon], 15); } else { map.setView([39.5, -98.35], 4); }
+draw();
+</script>
+</body>
+</html>
