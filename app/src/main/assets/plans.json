@@ -1,0 +1,110 @@
+{
+  "snapshot_date": "2026-11-09",
+  "baseline_plan_id": "boost_unlimited",
+  "plans": [
+    {
+      "id": "boost_unlimited",
+      "provider": "Boost Mobile",
+      "name": "Unlimited",
+      "monthly": 25.0,
+      "monthly_without_autopay": 30.0,
+      "billing": "monthly prepaid, no contract",
+      "taxes_included": false,
+      "high_speed_gb": 30,
+      "after_cap": "512 Kbps",
+      "hotspot_included": false,
+      "hotspot_addon_monthly": 10.0,
+      "hotspot_note": "Hotspot draws from the same 30 GB your phone uses",
+      "network": "Mainly AT&T, with some T-Mobile access during Boost's network transition",
+      "source_confidence": "high",
+      "caveats": [
+        "$25 requires AutoPay; it is $30 without",
+        "Taxes and fees are added at checkout",
+        "Boost advertises the $25 price as locked ('Forever')",
+        "Data is deprioritized and slows to 512 Kbps after 30 GB"
+      ]
+    },
+    {
+      "id": "tello_20gb",
+      "provider": "Tello",
+      "name": "20 GB + unlimited talk/text",
+      "monthly": 20.0,
+      "billing": "monthly prepaid, no contract",
+      "taxes_included": false,
+      "high_speed_gb": 20,
+      "hotspot_included": true,
+      "hotspot_note": "Hotspot uses the plan's data balance (up to the full 20 GB)",
+      "network": "T-Mobile",
+      "source_confidence": "medium",
+      "caveats": [
+        "Taxes and fees are added at checkout",
+        "No AutoPay discount and no price-lock guarantee",
+        "Tello's plan lineup and prices changed over time and sources disagree (an older source lists a 10 GB plan at about $19); confirm on tello.com",
+        "Your A34 has no eSIM, so you would need a mailed physical SIM"
+      ]
+    },
+    {
+      "id": "usm_10gb_gig",
+      "provider": "US Mobile",
+      "name": "10 GB By the Gig",
+      "monthly": 20.0,
+      "billing": "monthly prepaid, no contract",
+      "taxes_included": true,
+      "high_speed_gb": 10,
+      "hotspot_included": true,
+      "hotspot_note": "Reported as included; allowance varies by source, confirm",
+      "network": "You choose Verizon, T-Mobile, or AT&T",
+      "source_confidence": "medium",
+      "caveats": [
+        "Taxes and fees are included in the listed price",
+        "Data stops or slows sharply after the cap, depending on plan",
+        "Plan names and prices vary between sources; confirm on usmobile.com"
+      ]
+    },
+    {
+      "id": "usm_flex_annual",
+      "provider": "US Mobile",
+      "name": "Unlimited Flex (annual)",
+      "monthly": 17.5,
+      "upfront_annual": 210.0,
+      "billing": "paid yearly upfront (prepaid)",
+      "taxes_included": true,
+      "high_speed_gb": 10,
+      "after_cap": "1 Mbps",
+      "hotspot_included": true,
+      "hotspot_note": "About 5 GB of hotspot",
+      "network": "You choose Verizon, T-Mobile, or AT&T",
+      "source_confidence": "medium",
+      "caveats": [
+        "You pay about $210 up front for the year; check the refund policy before paying",
+        "Only about 10 GB of fast data, then 1 Mbps",
+        "Hotspot allowance is smaller than on the unlimited plans"
+      ]
+    },
+    {
+      "id": "usm_starter_tmobile",
+      "provider": "US Mobile",
+      "name": "Unlimited Starter (T-Mobile network)",
+      "monthly": 25.0,
+      "billing": "monthly prepaid, no contract",
+      "taxes_included": true,
+      "high_speed_gb": 70,
+      "after_cap": "1 Mbps",
+      "hotspot_included": true,
+      "hotspot_note": "10 GB hotspot",
+      "network": "T-Mobile (Verizon and AT&T versions exist at similar prices)",
+      "source_confidence": "medium",
+      "caveats": [
+        "Taxes and fees are included in the listed price",
+        "An annual version costs less per month but is paid upfront",
+        "Data is deprioritized versus the carrier's own customers"
+      ]
+    }
+  ],
+  "general_caveats": [
+    "All of these are prepaid, no-contract plans. 'Prepaid' means you pay before the service period, and annual plans lock your money in for a year.",
+    "Prices and plan details change often and sources disagree. This is a snapshot, not a quote.",
+    "Switching means keeping or porting your number and installing a new physical SIM. Confirm your phone is unlocked first.",
+    "Introductory promotions and price changes at renewal are not modeled."
+  ]
+}
